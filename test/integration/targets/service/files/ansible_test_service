@@ -5,6 +5,7 @@
 
 import os
 import resource
+import signal
 import sys
 import time
 
@@ -21,7 +22,7 @@ def createDaemon():
    try:
       pid = os.fork()
    except OSError as e:
-      raise Exception, "%s [%d]" % (e.strerror, e.errno)
+      raise Exception("%s [%d]" % (e.strerror, e.errno))
 
    if (pid == 0):
       os.setsid()
@@ -29,7 +30,7 @@ def createDaemon():
       try:
          pid = os.fork()
       except OSError as e:
-         raise Exception, "%s [%d]" % (e.strerror, e.errno)
+         raise Exception("%s [%d]" % (e.strerror, e.errno))
 
       if (pid == 0):
          os.chdir(WORKDIR)
@@ -45,7 +46,7 @@ def createDaemon():
    maxfd = resource.getrlimit(resource.RLIMIT_NOFILE)[1]
    if (maxfd == resource.RLIM_INFINITY):
       maxfd = MAXFD
-  
+
    for fd in range(0, maxfd):
       try:
          os.close(fd)
@@ -59,6 +60,8 @@ def createDaemon():
    return(0)
 
 if __name__ == "__main__":
+
+   signal.signal(signal.SIGHUP, signal.SIG_IGN)
 
    retCode = createDaemon()
 

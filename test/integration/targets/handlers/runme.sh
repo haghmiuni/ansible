@@ -3,6 +3,7 @@
 set -eux
 
 ansible-playbook test_handlers.yml -i inventory.handlers -v "$@" --tags scenario1
+ansible-playbook test_listening_handlers.yml -i inventory.handlers -v "$@"
 
 [ "$(ansible-playbook test_handlers.yml -i inventory.handlers -v "$@" --tags scenario2 -l A \
 | egrep -o 'RUNNING HANDLER \[test_handlers : .*?]')" = "RUNNING HANDLER [test_handlers : test handler]" ]
@@ -40,3 +41,28 @@ ansible-playbook test_handlers.yml -i inventory.handlers -v "$@" --tags scenario
 
 [ "$(ansible-playbook test_handlers_include.yml -i ../../inventory -v "$@" --tags role_include_handlers \
 | egrep -o 'RUNNING HANDLER \[test_handlers_include : .*?]')" = "RUNNING HANDLER [test_handlers_include : test handler]" ]
+
+[ "$(ansible-playbook test_handlers_include_role.yml -i ../../inventory -v "$@" \
+| egrep -o 'RUNNING HANDLER \[test_handlers_include_role : .*?]')" = "RUNNING HANDLER [test_handlers_include_role : test handler]" ]
+
+# Notify handler listen
+ansible-playbook test_handlers_listen.yml -i inventory.handlers -v "$@"
+
+# Notify inexistent handlers results in error
+set +e
+result="$(ansible-playbook test_handlers_inexistent_notify.yml -i inventory.handlers "$@" 2>&1)"
+set -e
+grep -q "ERROR! The requested handler 'notify_inexistent_handler' was not found in either the main handlers list nor in the listening handlers list" <<< "$result"
+
+# Notify inexistent handlers without errors when ANSIBLE_ERROR_ON_MISSING_HANDLER=false
+ANSIBLE_ERROR_ON_MISSING_HANDLER=false ansible-playbook test_handlers_inexistent_notify.yml -i inventory.handlers -v "$@"
+
+# https://github.com/ansible/ansible/issues/36649
+output_dir=/tmp
+set +e
+result="$(ansible-playbook test_handlers_any_errors_fatal.yml -e output_dir=$output_dir -i inventory.handlers -v "$@" 2>&1)"
+set -e
+[ ! -f $output_dir/should_not_exist_B ] || (rm -f $output_dir/should_not_exist_B && exit 1)
+
+# https://github.com/ansible/ansible/issues/47287
+[ "$(ansible-playbook test_handlers_including_task.yml -i ../../inventory -v "$@" | egrep -o 'failed=[0-9]+')" = "failed=0" ]
